@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: iot-platform
+
+  # Cassandra
+  cassandra:
+    keyspace-name: iot_platform
+    contact-points: cassandra
+    port: 9042
+    local-datacenter: datacenter1
+    schema-action: CREATE_IF_NOT_EXISTS
+
+  # Kafka
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: backend-cg
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      enable-auto-commit: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+
+# JWT
+jwt:
+  secret: "YOUR_SECRET_KEY_CHANGE_IN_PRODUCTION_MIN_32_CHARS!!"
+  access-token-expiration: 900000      # 15 minutes
+  refresh-token-expiration: 604800000  # 7 days
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    com.iot.platform: INFO
+    org.springframework.kafka: WARN
+    com.datastax: WARN
+  pattern:
+    console: "%d{ISO8601} [%t] %-5level %logger{36} - %msg%n"
