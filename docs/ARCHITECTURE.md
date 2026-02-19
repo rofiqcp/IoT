@@ -2,45 +2,52 @@
 
 ## 1. High-Level Architecture
 
+Both **ESP32** and **Python Mini PC** are peer device types that connect
+**directly** to the central EMQX cluster. There is no edge gateway layer —
+every device publishes telemetry / state straight to the cloud.
+
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        DEVICE LAYER                                 │
-│   ESP32 (thousands)  ──MQTT/TLS──►  EMQX Cluster (3-node)         │
-└───────────────────────────────────────┬─────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────┐
-│                        EDGE / GATEWAY LAYER                         │
-│   Python Gateway (asyncio)                                          │
-│   • MQTT subscriber  → Kafka producer  (telemetry, state, events)  │
-│   • Kafka consumer   → MQTT publisher  (commands)                  │
-│   • Disk buffer for offline resilience                              │
-└───────────────────────────────────────┬─────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────┐
-│                        STREAMING LAYER                              │
-│   Apache Kafka (3-broker cluster)                                   │
-│   Topics: telemetry, device-state, events, commands, alarms, audit │
-└───────────────────────────────────────┬─────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────┐
-│                        BACKEND LAYER                                │
-│   Spring Boot 3.x                                                   │
-│   • REST API  • Kafka consumers  • WebSocket  • JWT/RBAC           │
-│   • Alarm engine  • Audit logger  • Tenant context                 │
-└───────────────────────────────────────┬─────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────┐
-│                        DATABASE LAYER                               │
-│   Apache Cassandra (3-node cluster)                                 │
-│   • Telemetry (time-series, TTL 90d)                               │
-│   • Device state  • Events  • Alarms  • Users  • Audit            │
-└───────────────────────────────────────┬─────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────┐
-│                        FRONTEND LAYER                               │
-│   React + TypeScript + Vite                                         │
-│   • WebSocket realtime  • Recharts  • RBAC UI  • Zustand          │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         DEVICE LAYER                                 │
+│                                                                      │
+│   ESP32 (thousands) ──MQTT/TLS──┐                                   │
+│                                  ├──►  EMQX Cluster (3-node)        │
+│   Python Mini PC    ──MQTT/TLS──┘                                   │
+│   (hundreds)                                                         │
+└──────────────────────────────────────┬───────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────┐
+│                    MQTT-KAFKA BRIDGE (central)                       │
+│   Python asyncio service                                             │
+│   • Subscribes EMQX wildcard topics → produces to Kafka             │
+│   • Consumes Kafka command topic   → publishes to EMQX              │
+└──────────────────────────────────────┬───────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────┐
+│                        STREAMING LAYER                               │
+│   Apache Kafka (3-broker cluster)                                    │
+│   Topics: telemetry, device-state, events, commands, alarms, audit  │
+└──────────────────────────────────────┬───────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────┐
+│                        BACKEND LAYER                                 │
+│   Spring Boot 3.x                                                    │
+│   • REST API  • Kafka consumers  • WebSocket  • JWT/RBAC            │
+│   • Alarm engine  • Audit logger  • Tenant context                  │
+└──────────────────────────────────────┬───────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────┐
+│                        DATABASE LAYER                                │
+│   Apache Cassandra (3-node cluster)                                  │
+│   • Telemetry (time-series, TTL 90d)                                │
+│   • Device state  • Events  • Alarms  • Users  • Audit             │
+└──────────────────────────────────────┬───────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────┐
+│                        FRONTEND LAYER                                │
+│   React + TypeScript + Vite                                          │
+│   • WebSocket realtime  • Recharts  • RBAC UI  • Zustand           │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 2. Tenant Hierarchy
@@ -57,33 +64,42 @@ Tenant (company)
 
 ### A. Telemetry Flow
 ```
-ESP32 → MQTT publish (QoS 1)
-     → EMQX broker
-     → Python Gateway (subscriber)
-     → Kafka topic: iot.telemetry
-     → Spring Boot consumer
-     → Cassandra (telemetry_by_device)
-     → WebSocket push to React dashboard
+Device (ESP32 or Python Mini PC)
+  → MQTT publish (QoS 1)
+  → EMQX broker
+  → MQTT-Kafka Bridge (central subscriber)
+  → Kafka topic: iot.telemetry
+  → Spring Boot consumer
+  → Cassandra (telemetry_by_device)
+  → WebSocket push to React dashboard
 ```
 
 ### B. Command Flow
 ```
 React UI → REST POST /api/commands
         → Spring Boot → Kafka topic: iot.commands
-        → Python Gateway (consumer)
-        → MQTT publish to device
-        → ESP32 executes command
-        → ESP32 publishes ACK → MQTT → Gateway → Kafka → Backend
+        → MQTT-Kafka Bridge (consumer → MQTT publish)
+        → EMQX → Device (ESP32 or Python Mini PC)
+        → Device executes command
+        → Device publishes ACK → MQTT → Bridge → Kafka → Backend
 ```
 
 ### C. Device State (Presence)
 ```
-ESP32 connects with LWT message (offline payload)
-ESP32 publishes heartbeat every 30s
-Gateway detects state changes → Kafka: iot.device-state
+Device connects with LWT message (offline payload)
+Device publishes heartbeat every 30s
+Bridge detects state changes → Kafka: iot.device-state
 Backend updates Cassandra device_state table
 Frontend shows online/offline badge via WebSocket
 ```
+
+### D. Device Types
+| Type | Runtime | Typical Use |
+|------|---------|-------------|
+| ESP32 | C/Arduino | Sensors, relays, low-power |
+| Python Mini PC | Python asyncio | Cameras, gateways, heavy compute |
+
+Both use the same MQTT topic scheme and protocol.
 
 ## 4. MQTT Design
 

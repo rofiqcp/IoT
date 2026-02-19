@@ -1,0 +1,25 @@
+# Device identity — set per device during provisioning
+device:
+  tenant_id: "tenant-abc"
+  site_id: "site-01"
+  device_id: "minipc-001"
+  device_type: "MINIPC"
+
+mqtt:
+  host: emqx
+  port: 1883
+  username: "tenant-abc:minipc-001"
+  password: "device_secret_key"
+  keepalive: 60
+
+telemetry:
+  interval_seconds: 10
+  # Metrics to collect (built-in system metrics for mini PC)
+  metrics:
+    - cpu_percent
+    - memory_percent
+    - disk_percent
+    - cpu_temperature
+
+heartbeat:
+  interval_seconds: 30

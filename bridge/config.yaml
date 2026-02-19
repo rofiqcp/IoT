@@ -1,0 +1,31 @@
+mqtt:
+  host: emqx
+  port: 1883
+  username: bridge_user
+  password: bridge_secret
+  client_id: iot-bridge-central
+  # Wildcard subscription to receive all device messages
+  subscribe_topics:
+    - "+/+/+/telemetry"     # {tenant}/{site}/{device}/telemetry
+    - "+/+/+/state"         # {tenant}/{site}/{device}/state
+    - "+/+/+/event"         # {tenant}/{site}/{device}/event
+    - "+/+/+/command/ack"   # {tenant}/{site}/{device}/command/ack
+    - "+/+/+/lwt"           # {tenant}/{site}/{device}/lwt
+
+kafka:
+  bootstrap_servers: kafka:9092
+  # Mapping: MQTT topic suffix → Kafka topic
+  topic_map:
+    telemetry: iot.telemetry
+    state: iot.device-state
+    event: iot.events
+    "command/ack": iot.command-acks
+    lwt: iot.device-state
+  command_topic: iot.commands
+  consumer_group: bridge-commands-cg
+
+buffer:
+  # Disk buffer for offline resilience
+  enabled: true
+  path: /tmp/bridge_buffer
+  max_size_mb: 512
