@@ -1,0 +1,9 @@
+# MQTT-Kafka Bridge
+#
+# Central service that bridges EMQX ↔ Kafka.
+# Subscribes to all device MQTT topics → produces to Kafka topics.
+# Consumes Kafka command topic → publishes to device-specific MQTT topics.
+
+aiomqtt>=2.0.0
+confluent-kafka>=2.3.0
+pyyaml>=6.0

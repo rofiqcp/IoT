@@ -1,0 +1,16 @@
+[Unit]
+Description=IoT Python Device Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=iot
+WorkingDirectory=/opt/iot-device-agent
+ExecStart=/opt/iot-device-agent/venv/bin/python agent.py
+Restart=always
+RestartSec=5
+Environment=DEVICE_CONFIG=/opt/iot-device-agent/config.yaml
+
+[Install]
+WantedBy=multi-user.target

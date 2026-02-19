@@ -1,0 +1,9 @@
+# Python Device Agent — runs on Mini PC
+#
+# This is a device (not a gateway). It collects local sensor data,
+# publishes telemetry and state directly to EMQX, and listens for
+# commands — exactly like an ESP32 but on a full Linux mini PC.
+
+aiomqtt>=2.0.0
+pyyaml>=6.0
+psutil>=5.9.0
