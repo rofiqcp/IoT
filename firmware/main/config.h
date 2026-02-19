@@ -4,15 +4,25 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// --- WiFi ---
+// --- WiFi (override at build time: -DWIFI_SSID=\"MySSID\") ---
+#ifndef WIFI_SSID
 #define WIFI_SSID        "YourWiFiSSID"
+#endif
+#ifndef WIFI_PASSWORD
 #define WIFI_PASSWORD    "YourWiFiPassword"
+#endif
 
-// --- MQTT Broker (EMQX) ---
+// --- MQTT Broker (override at build time or via provisioning) ---
+#ifndef MQTT_HOST
 #define MQTT_HOST        "emqx.example.com"
+#endif
 #define MQTT_PORT        1883          // Use 8883 for TLS
+#ifndef MQTT_USERNAME
 #define MQTT_USERNAME    "tenant-abc:esp32-001"
+#endif
+#ifndef MQTT_PASSWORD
 #define MQTT_PASSWORD    "device_secret_key"
+#endif
 
 // --- Device Identity ---
 #define TENANT_ID        "tenant-abc"

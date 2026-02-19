@@ -30,7 +30,10 @@ api.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(originalRequest);
         } catch {
-          localStorage.clear();
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('role');
+          localStorage.removeItem('tenantId');
           window.location.href = '/login';
         }
       }

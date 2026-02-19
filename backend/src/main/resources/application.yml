@@ -32,7 +32,7 @@ spring:
 
 # JWT
 jwt:
-  secret: "YOUR_SECRET_KEY_CHANGE_IN_PRODUCTION_MIN_32_CHARS!!"
+  secret: "${JWT_SECRET:DefaultDevSecretKeyThatMustBeChangedInProduction32}"
   access-token-expiration: 900000      # 15 minutes
   refresh-token-expiration: 604800000  # 7 days
 

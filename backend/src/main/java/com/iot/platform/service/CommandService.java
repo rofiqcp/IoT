@@ -1,5 +1,7 @@
 package com.iot.platform.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.iot.platform.model.Command;
 import com.iot.platform.repository.CommandRepository;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -13,6 +15,7 @@ public class CommandService {
 
     private final CommandRepository commandRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public CommandService(CommandRepository commandRepository,
                           KafkaTemplate<String, String> kafkaTemplate) {
@@ -26,12 +29,19 @@ public class CommandService {
         Command cmd = new Command(tenantId, deviceId, commandId, commandType, payload, userId);
         commandRepository.save(cmd);
 
-        // Publish to Kafka for the gateway to pick up and forward via MQTT
-        String kafkaKey = tenantId + "|" + deviceId;
-        String kafkaValue = String.format(
-                "{\"commandId\":\"%s\",\"tenantId\":\"%s\",\"deviceId\":\"%s\",\"type\":\"%s\",\"payload\":%s}",
-                commandId, tenantId, deviceId, commandType, payload);
-        kafkaTemplate.send("iot.commands", kafkaKey, kafkaValue);
+        // Publish to Kafka for the bridge to forward via MQTT
+        try {
+            String kafkaKey = tenantId + "|" + deviceId;
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("commandId", commandId.toString());
+            node.put("tenantId", tenantId.toString());
+            node.put("deviceId", deviceId.toString());
+            node.put("type", commandType);
+            node.put("payload", payload);
+            kafkaTemplate.send("iot.commands", kafkaKey, objectMapper.writeValueAsString(node));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to publish command to Kafka", e);
+        }
         return cmd;
     }
 
